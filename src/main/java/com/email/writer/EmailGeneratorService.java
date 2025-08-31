@@ -1,5 +1,8 @@
 package com.email.writer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -33,8 +36,27 @@ public class EmailGeneratorService {
                 "    ]\n" +
                 "  }",prompt);
         //send request
+        String response=webClient.post()
+                .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-2.5-flash:generateContent").build()
+                        ).header("x-goog-api-key",apiKey)
+                .header("Content-Type","application/json")
+                .bodyValue(requestBody).retrieve().bodyToMono(String.class).block();
         //extract response
-        return null;
+        return extractResponseContent(response);
+    }
+
+    private String extractResponseContent(String response) {
+        ObjectMapper mapper=new ObjectMapper();
+        try {
+            JsonNode root=mapper.readTree(response);
+            return root.path("candidates").get(0)
+                    .path("content")
+                    .path("parts").get(0)
+                    .path("text").asText();
+
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String buildPrompt(EmailRequest emailRequest) {
